@@ -29,7 +29,8 @@ signal.signal(signal.SIGINT,request_stop)
 signal.signal(signal.SIGTERM,request_stop)
 def screenshot(page):
     im=Image.open(io.BytesIO(page.screenshot(timeout=30000))).convert('RGB')
-    if im.size!=(WIDTH,HEIGHT): raise RuntimeError('Viewport changed: '+str(im.size))
+    if abs(im.width-WIDTH)>1 or abs(im.height-HEIGHT)>1: raise RuntimeError('Viewport changed: '+str(im.size))
+    if im.size!=(WIDTH,HEIGHT):im=im.crop((0,0,WIDTH,HEIGHT))
     return im
 def ocr(im):
     return pytesseract.image_to_string(im.resize((im.width*2,im.height*2)),config='--psm 11')
@@ -44,7 +45,7 @@ def prepare_menu(page):
     page.add_style_tag(content='html,body{margin:0!important;padding:0!important;overflow:hidden!important;width:960px!important;height:600px!important;background:#000!important}canvas,#unity-container{position:fixed!important;left:0!important;top:0!important;width:960px!important;height:600px!important;min-width:960px!important;max-width:960px!important;min-height:600px!important;max-height:600px!important;margin:0!important;padding:0!important;transform:none!important}#unity-footer{display:none!important}')
     m=page.evaluate('({width:innerWidth,height:innerHeight,outerWidth:outerWidth,outerHeight:outerHeight,x:screenX,y:screenY})')
     (OUT/'viewport.json').write_text(json.dumps(m,indent=2))
-    if m['width']!=WIDTH or m['height']!=HEIGHT: raise RuntimeError('Fullscreen viewport mismatch: '+str(m))
+    if abs(m['width']-WIDTH)>1 or abs(m['height']-HEIGHT)>1: raise RuntimeError('Fullscreen viewport mismatch: '+str(m))
     for attempt in range(120):
         im=screenshot(page); point=find_start(im)
         if point:return im,point
