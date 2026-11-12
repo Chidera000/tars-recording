@@ -1,41 +1,50 @@
-
 name: Record TARS Simulation
 
 on:
   workflow_dispatch:
+    inputs:
+      record_minutes:
+        description: 'Capture minutes, maximum 330 on the free hosted runner'
+        type: number
+        default: 330
+        required: true
+      probe:
+        description: 'Short fixed-frame verification run (at most 3 minutes)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
+concurrency:
+  group: tars-recording
+  cancel-in-progress: false
+
 jobs:
   record:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
-
+    timeout-minutes: 360
+    env:
+      TARS_RECORD_MINUTES: ${{ inputs.record_minutes }}
+      TARS_PROBE: ${{ inputs.probe }}
     steps:
-      - name: Get repository files
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Install recording tools
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb ffmpeg tesseract-ocr
-          pip install playwright pillow pytesseract
+          pip install playwright pillow pytesseract numpy
           python -m playwright install --with-deps chromium
-
-      - name: Record TARS
-        run: |
-          xvfb-run -a -s "-screen 0 1280x800x24" python record_tars.py
-
-      - name: Save recording
+      - name: Record and export
+        run: xvfb-run -a -s "-screen 0 960x600x24" python record_tars.py
+      - name: Save recording and evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: TARS-Recording
+          name: TARS-Recording-${{ github.run_number }}
           path: output/
+          compression-level: 0
           retention-days: 7
